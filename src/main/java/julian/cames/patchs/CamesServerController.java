@@ -34,4 +34,10 @@ public class CamesServerController {
     public String modifyRegUniParam(@RequestBody ModifyUniParam modifyUniParam) throws Exception{
     	return uniformParameter.modifyRegUniParamToReal(modifyUniParam);
     }
+    
+    @CrossOrigin
+    @PostMapping("/getConfigData")
+    public String getConfigData(@RequestBody ModifyUniParam modifyUniParam) throws Exception{
+    	return uniformParameter.getConfigData(modifyUniParam);
+    }
 }

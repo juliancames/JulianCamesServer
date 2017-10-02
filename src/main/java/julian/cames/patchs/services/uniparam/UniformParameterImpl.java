@@ -27,6 +27,9 @@ public class UniformParameterImpl implements UniformParameter {
 	@Value("${uniparam.part.posName.size}") private int uniparam_part_posName_size;
 	@Value("${uniparam.part.part1.offset}") private int uniparam_part_part1_offset;
 	@Value("${uniparam.part.part1.size}") private int uniparam_part_part1_size;
+	@Value("${kit.mainName.offset}") private int kit_mainName_offset;
+	@Value("${kit.mainName.size}") private int kit_mainName_size;
+	
 	private byte zero = 0x00;
 	private final String REAL = "_realUni";
 	
@@ -162,5 +165,50 @@ public class UniformParameterImpl implements UniformParameter {
 	    return newData;
 	}
 	
+	public String getConfigData(ModifyUniParam modifyUniParam) throws Exception
+	{
+		byte[] srcData = fileService.getDataBytes(modifyUniParam.getSrcData());
+		int index = modifyUniParam.getIndexName();
+		kitConfiguration kitConfiguration;
+		
+		//valid name	
+		byte[] posName = Arrays.copyOfRange(srcData, index + uniparam_part_posName_offset, index + uniparam_part_posName_offset + uniparam_part_posName_size);
+		int startPositionName = fileService.bit32ToInt(posName);
+		int endPositionName = fileService.indexOfByteArray(srcData, zero, startPositionName);
+		byte[] filenameBytes = Arrays.copyOfRange(srcData, startPositionName, endPositionName);
+		String filename = fileService.bytesToString(filenameBytes);
+		int offset = index;
+		if(filename.indexOf(REAL)>0){
+			byte[] dataUniParam = Arrays.copyOfRange(srcData, offset, offset + uniparam_dataSize);
+			byte[] posConfigReg = Arrays.copyOfRange(dataUniParam, uniparam_part_posConfig_offset, uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
+			int posConfigRegInt = fileService.bit32ToInt(posConfigReg);
+			
+		    byte[] kitConfigBytes = Arrays.copyOfRange(srcData, posConfigRegInt, posConfigRegInt + 128);
+		    
+		    String filenameKit, filenameBack, filenameChest, filenameLeg, filenameName;
+		    int nameOffset = kit_mainName_offset;
+		    byte[] filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
+		    filenameKit = fileService.bytesToString(filenames);
+		    nameOffset += kit_mainName_size;
+		    filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
+		    filenameBack = fileService.bytesToString(filenames);
+		    nameOffset += kit_mainName_size;
+		    filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
+		    filenameChest = fileService.bytesToString(filenames);
+		    nameOffset += kit_mainName_size;
+		    filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
+		    filenameLeg = fileService.bytesToString(filenames);
+		    nameOffset += kit_mainName_size;
+		    filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
+		    filenameName = fileService.bytesToString(filenames);		    
+		    
+		    kitConfiguration = new kitConfiguration(filenameKit, filenameBack, filenameChest, filenameLeg, filenameName);
+		    
+		}else				
+			kitConfiguration = new kitConfiguration("DEF_NAME", "", "", "", "");
+		ObjectMapper mapper = new ObjectMapper();
+		String jsonInString = mapper.writeValueAsString(kitConfiguration);
+		return jsonInString;		
+	}
 	
 }
