@@ -32,7 +32,12 @@ public class UniformParameterImpl implements UniformParameter {
 	
 	private byte zero = 0x00;
 	private final String REAL = "_realUni";
+	private final int LENGTH_EXT_FILE = 4;
 	
+	/**
+	 * read file uniParam
+	 * 
+	 */
 	public String readUniParam(String data) throws Exception{
 		
 		byte[] dataBytes = fileService.getDataBytes(data);		
@@ -91,7 +96,7 @@ public class UniformParameterImpl implements UniformParameter {
 		
 		//update name
 		int oldLength = filename.length();		
-		String newFileName = filename.substring(0, oldLength - 4) + REAL + filename.substring(oldLength - 4, oldLength);
+		String newFileName = filename.substring(0, oldLength - LENGTH_EXT_FILE) + REAL + filename.substring(oldLength - LENGTH_EXT_FILE, oldLength);
 		int newLength = newFileName.length();
 		int diff = newLength - oldLength;		
 		byte[] newField = fileService.StringToBytes(newFileName);
@@ -110,8 +115,54 @@ public class UniformParameterImpl implements UniformParameter {
 		return readUniParam(fileService.getJsonFromBytes(newData));
 	}
 	
+	public String addKit(ModifyUniParam modifyUniParam)throws Exception
+	{
+		byte[] srcData = fileService.getDataBytes(modifyUniParam.getSrcData());
+		int index = modifyUniParam.getIndexName();
+		
+		//valid name	
+		byte[] posName = Arrays.copyOfRange(srcData, index + uniparam_part_posName_offset, index + uniparam_part_posName_offset + uniparam_part_posName_size);
+		int startPositionName = fileService.bit32ToInt(posName);
+		int endPositionName = fileService.indexOfByteArray(srcData, zero, startPositionName);
+		byte[] filenameBytes = Arrays.copyOfRange(srcData, startPositionName, endPositionName);
+		String filename = fileService.bytesToString(filenameBytes);
+		if(filename.indexOf(REAL)>0)
+			return readUniParam(fileService.getJsonFromBytes(srcData));
+		
+		//get current number of elements
+		byte[] numOfElementsByte = Arrays.copyOfRange(srcData, uniparam_numElementsOffset, uniparam_numElementsOffset + uniparam_numElementsSize);
+		int numOfElements = fileService.bit32ToInt(numOfElementsByte);
+		//set new number of elements
+		numOfElements++;
+		System.arraycopy(fileService.IntToBit32(numOfElements), 0, srcData, uniparam_numElementsOffset, uniparam_numElementsSize);
+		
+		//Add position register
+		byte[] newDataUniParam = Arrays.copyOfRange(srcData, index, index + uniparam_dataSize);
+		byte[] newData = new byte[srcData.length + uniparam_dataSize];
+		int offset = 0;
+		//FirstPart          
+	    byte[] tempBuffer = Arrays.copyOfRange(srcData, 0, index + uniparam_dataSize);
+	    System.arraycopy(tempBuffer, 0, newData,offset,tempBuffer.length);
+	    offset += tempBuffer.length;
+	    //NewPosReg	    
+	    System.arraycopy(newDataUniParam, 0, newData,offset,newDataUniParam.length);
+	    offset += newDataUniParam.length;
+	    //LastPart
+	    tempBuffer = Arrays.copyOfRange(srcData, index + uniparam_dataSize, srcData.length);
+	    System.arraycopy(tempBuffer, 0, newData,offset,tempBuffer.length);
+		
+	    //create real filename
+		int oldLength = filename.length();
+		String newFileName = filename.substring(0, oldLength - LENGTH_EXT_FILE) + REAL + filename.substring(oldLength - LENGTH_EXT_FILE, oldLength);
+		
+		byte[] newField = fileService.StringToBytes(newFileName);
+		newData = addDataToFile (newData, index, newFileName.length(), newField, 0, startPositionName + oldLength, 0);
+		
+		return readUniParam(fileService.getJsonFromBytes(newData));
+	}
+	
 	/**
-	 * 
+	 * Add bytes to file
 	 * @param srcData
 	 * @param index
 	 * @param diff
@@ -165,6 +216,9 @@ public class UniformParameterImpl implements UniformParameter {
 	    return newData;
 	}
 	
+	/**
+	 * get configuration kit data
+	 */
 	public String getConfigData(ModifyUniParam modifyUniParam) throws Exception
 	{
 		byte[] srcData = fileService.getDataBytes(modifyUniParam.getSrcData());
