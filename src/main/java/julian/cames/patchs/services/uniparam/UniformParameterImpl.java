@@ -33,6 +33,8 @@ public class UniformParameterImpl implements UniformParameter {
 	private byte zero = 0x00;
 	private final String REAL = "_realUni";
 	private final int LENGTH_EXT_FILE = 4;
+	private final int sizeDEF = 96;
+	private final int sizeREAL = 128;
 	
 	/**
 	 * read file uniParam
@@ -60,9 +62,9 @@ public class UniformParameterImpl implements UniformParameter {
 			String filename = fileService.bytesToString(filenameBytes);
 			
 			//ConfigUni
-			int sizeConfig = 96;
+			int sizeConfig = sizeDEF;
 			if(filename.indexOf(REAL)>0)
-				sizeConfig = 128;
+				sizeConfig = sizeREAL;
 			int startPositionConfig = fileService.bit32ToInt(posConfigReg);
 			byte[] configBytes = Arrays.copyOfRange(dataBytes, startPositionConfig, startPositionConfig + sizeConfig);
 			
@@ -100,17 +102,17 @@ public class UniformParameterImpl implements UniformParameter {
 		int newLength = newFileName.length();
 		int diff = newLength - oldLength;		
 		byte[] newField = fileService.StringToBytes(newFileName);
-		byte[] newData = addDataToFile (srcData, index, diff, newField, oldLength, startPositionName, 0);
+		byte[] newData;
+		
+		newData = updatePositions (srcData, index, diff, 0);
+		newData = addDataToFile (newData, newField, oldLength, startPositionName);
 		
 		//update config
 		byte[] posConfig = Arrays.copyOfRange(srcData, index + uniparam_part_posConfig_offset, index + uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
-		int startPositionCfg = fileService.bit32ToInt(posConfig);
-		int sizeDEF = 96;
-		int sizeREAL = 128;
-		newField = new byte[128];
-			for(int i = 0;i<128;i++)
-				newField[i] = 0;
-		newData = addDataToFile (newData, index, sizeREAL - sizeDEF, newField, sizeDEF, startPositionCfg, 1);
+		int startPositionCfg = fileService.bit32ToInt(posConfig);		
+		newField = getRealConfigBytes();			
+		newData = updatePositions (newData, index, sizeREAL - sizeDEF, 1);
+		newData = addDataToFile (newData, newField, sizeDEF, startPositionCfg);
 		
 		return readUniParam(fileService.getJsonFromBytes(newData));
 	}
@@ -137,60 +139,55 @@ public class UniformParameterImpl implements UniformParameter {
 		System.arraycopy(fileService.IntToBit32(numOfElements), 0, srcData, uniparam_numElementsOffset, uniparam_numElementsSize);
 		
 		//Add position register
-		byte[] newDataUniParam = Arrays.copyOfRange(srcData, index, index + uniparam_dataSize);
-		byte[] newData = new byte[srcData.length + uniparam_dataSize];
-		int offset = 0;
-		//FirstPart          
-	    byte[] tempBuffer = Arrays.copyOfRange(srcData, 0, index + uniparam_dataSize);
-	    System.arraycopy(tempBuffer, 0, newData,offset,tempBuffer.length);
-	    offset += tempBuffer.length;
-	    //NewPosReg	    
-	    System.arraycopy(newDataUniParam, 0, newData,offset,newDataUniParam.length);
-	    offset += newDataUniParam.length;
-	    //LastPart
-	    tempBuffer = Arrays.copyOfRange(srcData, index + uniparam_dataSize, srcData.length);
-	    System.arraycopy(tempBuffer, 0, newData,offset,tempBuffer.length);
-		
-	    //create real filename
+		byte[] newDataUniParam = Arrays.copyOfRange(srcData, index, index + uniparam_dataSize);		
+		byte[] newData = addDataToFile (srcData, newDataUniParam, 0, index + uniparam_dataSize);	
+	    newData = updatePositions (newData, 0, uniparam_dataSize, 2);
+	    
+	    //Add real filename
 		int oldLength = filename.length();
 		String newFileName = filename.substring(0, oldLength - LENGTH_EXT_FILE) + REAL + filename.substring(oldLength - LENGTH_EXT_FILE, oldLength);
+		byte[] newField = new byte[newFileName.length() + 1];
+		System.arraycopy(fileService.StringToBytes(newFileName), 0, newField, 0,newFileName.length());		
+		newData = addDataToFile (newData, newField, 0, startPositionName + uniparam_dataSize);
+		newData = updatePositions (newData, index, newField.length, 0);
 		
-		byte[] newField = fileService.StringToBytes(newFileName);
-		newData = addDataToFile (newData, index, newFileName.length(), newField, 0, startPositionName + oldLength, 0);
+		//Add new real configuration
+		byte[] posConfig = Arrays.copyOfRange(newData, index + uniparam_part_posConfig_offset, index + uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
+		int startPositionCfg = fileService.bit32ToInt(posConfig);		
+		newField = getRealConfigBytes();					
+		newData = addDataToFile (newData, newField, 0, startPositionCfg);
+		newData = updatePositions (newData, index, sizeREAL, 1);
 		
 		return readUniParam(fileService.getJsonFromBytes(newData));
 	}
 	
 	/**
-	 * Add bytes to file
+	 * update positions
 	 * @param srcData
 	 * @param index
 	 * @param diff
-	 * @param newField
-	 * @param oldLength
-	 * @param startPositionData
-	 * @param type: 0:names, 1:configuration
+	 * @param type: 0:names, 1:configuration, 2:generalAdd
 	 * @return
 	 */
-	private byte[] addDataToFile (byte[] srcData, int index, int diff, byte[] newField, int oldLength, int startPositionData, int type){
+	private byte[] updatePositions (byte[] srcData, int index, int diff, int type){
 		//get num of elements
 		byte[] numOfElementsByte = Arrays.copyOfRange(srcData, uniparam_numElementsOffset, uniparam_numElementsOffset + uniparam_numElementsSize);
 		int numOfElements = fileService.bit32ToInt(numOfElementsByte);
 		
 		//update positions
-		int fromIdx = index/12;
+		int fromIdx = index/uniparam_dataSize;
 		int offset = uniparam_offsetIni;
 		for(int i=0; i<numOfElements; i++){
 			byte[] dataUniParam = Arrays.copyOfRange(srcData, offset, offset + uniparam_dataSize);
 			//update names
-			if(i>fromIdx && type==0){
+			if((i>fromIdx && type==0) || type==2){
 				byte[] posNameReg = Arrays.copyOfRange(dataUniParam, uniparam_part_posName_offset, uniparam_part_posName_offset + uniparam_part_posName_size);
 				int posNameRegInt = fileService.bit32ToInt(posNameReg);
 				posNameRegInt += diff;			
 				System.arraycopy(fileService.IntToBit32(posNameRegInt), 0, srcData, offset + uniparam_part_posName_offset, uniparam_part_posName_size);
 			}
 			//update configurations
-			if((i>fromIdx && type==1) || type==0){
+			if((i>fromIdx && type==1) || type==0 || type==2){
 				byte[] posConfigReg = Arrays.copyOfRange(dataUniParam, uniparam_part_posConfig_offset, uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
 				int posConfigRegInt = fileService.bit32ToInt(posConfigReg);
 				posConfigRegInt += diff;
@@ -199,9 +196,20 @@ public class UniformParameterImpl implements UniformParameter {
 			
 			offset += uniparam_dataSize;
 		}
-		
-		byte[] newData = new byte[srcData.length + diff];
-		offset = 0;
+		return srcData;
+	}	
+	
+	/**
+	 * Add bytes to file
+	 * @param srcData
+	 * @param newField
+	 * @param oldLength
+	 * @param startPositionData
+	 * @return
+	 */
+	private byte[] addDataToFile (byte[] srcData, byte[] newField, int oldLength, int startPositionData){
+		byte[] newData = new byte[srcData.length + newField.length];
+		int offset = 0;
 		//FirstPart          
 	    byte[] tempBuffer = Arrays.copyOfRange(srcData, 0, startPositionData);
 	    System.arraycopy(tempBuffer, 0, newData,offset,tempBuffer.length);
@@ -214,6 +222,13 @@ public class UniformParameterImpl implements UniformParameter {
 	    System.arraycopy(tempBuffer, 0, newData,offset,tempBuffer.length);
 	    
 	    return newData;
+	}
+	
+	private byte[] getRealConfigBytes(){
+		byte[] newField = new byte[sizeREAL];
+		for(int i = 0;i<sizeREAL;i++)
+			newField[i] = 0;
+		return newField;
 	}
 	
 	/**
@@ -237,7 +252,7 @@ public class UniformParameterImpl implements UniformParameter {
 			byte[] posConfigReg = Arrays.copyOfRange(dataUniParam, uniparam_part_posConfig_offset, uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
 			int posConfigRegInt = fileService.bit32ToInt(posConfigReg);
 			
-		    byte[] kitConfigBytes = Arrays.copyOfRange(srcData, posConfigRegInt, posConfigRegInt + 128);
+		    byte[] kitConfigBytes = Arrays.copyOfRange(srcData, posConfigRegInt, posConfigRegInt + sizeREAL);
 		    
 		    String filenameKit, filenameBack, filenameChest, filenameLeg, filenameName;
 		    int nameOffset = kit_mainName_offset;
