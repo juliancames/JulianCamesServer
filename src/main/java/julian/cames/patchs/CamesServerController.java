@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import julian.cames.patchs.services.files.FileService;
+import julian.cames.patchs.services.uniparam.AddUniParam;
 import julian.cames.patchs.services.uniparam.ModifyUniParam;
 import julian.cames.patchs.services.uniparam.UniformParameter;
 
@@ -37,8 +38,8 @@ public class CamesServerController {
     
     @CrossOrigin
     @PostMapping("/addRegUniParam")
-    public String AddRegUniParam(@RequestBody ModifyUniParam modifyUniParam) throws Exception{
-    	return uniformParameter.addKit(modifyUniParam);
+    public String AddRegUniParam(@RequestBody AddUniParam addUniParam) throws Exception{
+    	return uniformParameter.addKit(addUniParam);
     }
     
     @CrossOrigin

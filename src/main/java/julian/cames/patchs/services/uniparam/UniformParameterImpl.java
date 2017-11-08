@@ -32,7 +32,6 @@ public class UniformParameterImpl implements UniformParameter {
 	
 	private byte zero = 0x00;
 	private final String REAL = "_realUni";
-	//private final String THIRD = "3rd";
 	private final int LENGTH_EXT_FILE = 4;
 	private final int sizeDEF = 96;
 	private final int sizeREAL = 128;
@@ -130,20 +129,18 @@ public class UniformParameterImpl implements UniformParameter {
 		return readUniParam(fileService.getJsonFromBytes(newData));
 	}
 	
-	public String addKit(ModifyUniParam modifyUniParam)throws Exception
+	public String addKit(AddUniParam addUniParam)throws Exception
 	{
-		byte[] srcData = fileService.getDataBytes(modifyUniParam.getSrcData());
-		int index = modifyUniParam.getIndexName();
+		byte[] srcData = fileService.getDataBytes(addUniParam.getSrcData());
+		int index = addUniParam.getIndexName();
+		String addNumKit = addUniParam.getNumKit();
 		
-		//valid name	
+		//name	
 		byte[] posName = Arrays.copyOfRange(srcData, index + uniparam_part_posName_offset, index + uniparam_part_posName_offset + uniparam_part_posName_size);
 		int startPositionName = fileService.bit32ToInt(posName);
 		int endPositionName = fileService.indexOfByteArray(srcData, zero, startPositionName);
 		byte[] filenameBytes = Arrays.copyOfRange(srcData, startPositionName, endPositionName);
 		String filename = fileService.bytesToString(filenameBytes);
-		
-		//if(filename.indexOf(REAL)>0)
-		//	return readUniParam(fileService.getJsonFromBytes(srcData));
 		
 		byte[] posConfig = Arrays.copyOfRange(srcData, index + uniparam_part_posConfig_offset, index + uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
 		int startPositionCfg = fileService.bit32ToInt(posConfig);
@@ -174,12 +171,16 @@ public class UniformParameterImpl implements UniformParameter {
 		byte[] newData = addDataToFile (srcData, newDataUniParam, 0, index + uniparam_dataSize);	
 	    newData = updatePositions (newData, 0, uniparam_dataSize, 2);
 	    
-	    //Add real filename	THIRD	
+	    //Add real filename
 		//String newFileName = filename.substring(0, oldLength - LENGTH_EXT_FILE) + REAL + filename.substring(oldLength - LENGTH_EXT_FILE, oldLength);
 		//String newFileName = filename.substring(0, oldLength - LENGTH_EXT_FILE - 3) + THIRD + REAL + filename.substring(oldLength - LENGTH_EXT_FILE, oldLength);
-	    String third_name = "_DEF_3rd_realUni.bin";
+	    
+	    //String third_name = "_DEF_3rd_realUni.bin";
+	    //
+	    
 	    String numKit = filename.split("_")[0];
-		String newFileName = numKit + third_name;
+		//String newFileName = numKit + third_name;
+	    String newFileName = String.format("%s_DEF_%s_realUni.bin", numKit, addNumKit);
 		
 		byte[] newField = new byte[newFileName.length() + 1];
 		System.arraycopy(fileService.StringToBytes(newFileName), 0, newField, 0,newFileName.length());	
