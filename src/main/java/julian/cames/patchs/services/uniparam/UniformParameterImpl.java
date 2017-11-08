@@ -172,14 +172,7 @@ public class UniformParameterImpl implements UniformParameter {
 	    newData = updatePositions (newData, 0, uniparam_dataSize, 2);
 	    
 	    //Add real filename
-		//String newFileName = filename.substring(0, oldLength - LENGTH_EXT_FILE) + REAL + filename.substring(oldLength - LENGTH_EXT_FILE, oldLength);
-		//String newFileName = filename.substring(0, oldLength - LENGTH_EXT_FILE - 3) + THIRD + REAL + filename.substring(oldLength - LENGTH_EXT_FILE, oldLength);
-	    
-	    //String third_name = "_DEF_3rd_realUni.bin";
-	    //
-	    
 	    String numKit = filename.split("_")[0];
-		//String newFileName = numKit + third_name;
 	    String newFileName = String.format("%s_DEF_%s_realUni.bin", numKit, addNumKit);
 		
 		byte[] newField = new byte[newFileName.length() + 1];
