@@ -11,6 +11,12 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import julian.cames.patchs.services.files.FileService;
+import julian.cames.patchs.services.uniparam.dto.AddUniParam;
+import julian.cames.patchs.services.uniparam.dto.ImportedData;
+import julian.cames.patchs.services.uniparam.dto.ModifyUniParam;
+import julian.cames.patchs.services.uniparam.dto.PositionUni;
+import julian.cames.patchs.services.uniparam.dto.ResponseUniParam;
+import julian.cames.patchs.services.uniparam.dto.kitConfiguration;
 
 @Service
 public class UniformParameterImpl implements UniformParameter {
@@ -29,12 +35,15 @@ public class UniformParameterImpl implements UniformParameter {
 	@Value("${uniparam.part.lengthConfig.size}") private int uniparam_part_lengthConfig_size;
 	@Value("${kit.mainName.offset}") private int kit_mainName_offset;
 	@Value("${kit.mainName.size}") private int kit_mainName_size;
+	@Value("${kit.firstColor.offset}") private int kit_firstColor_offset;
+	@Value("${kit.color.size}") private int kit_color_size;
 	
 	private byte zero = 0x00;
 	private final String REAL = "_realUni";
 	private final int LENGTH_EXT_FILE = 4;
 	private final int sizeDEF = 96;
 	private final int sizeREAL = 128;
+	private final int lengthREAL = 120;
 	
 	/**
 	 * read file uniParam
@@ -102,8 +111,7 @@ public class UniformParameterImpl implements UniformParameter {
 		if(filename.indexOf(REAL)>0)
 			return readUniParam(fileService.getJsonFromBytes(srcData));
 		
-		//update lengthConfig
-		int lengthREAL = 120;
+		//update lengthConfig		
 		byte[] lengthConfig = fileService.IntToBit32(lengthREAL);
 		System.arraycopy(lengthConfig, 0, srcData, index + uniparam_part_lengthConfig_offset, uniparam_part_lengthConfig_size);
 		
@@ -121,7 +129,7 @@ public class UniformParameterImpl implements UniformParameter {
 		//update configuration
 		byte[] posConfig = Arrays.copyOfRange(srcData, index + uniparam_part_posConfig_offset, index + uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
 		int startPositionCfg = fileService.bit32ToInt(posConfig);		
-		newField = getRealConfigBytes();			
+		newField = getRealConfigBytes(newFileName);			
 		
 		newData = updatePositions (newData, index, sizeREAL - sizeDEF, 1);
 		newData = addDataToFile (newData, newField, sizeDEF, startPositionCfg);
@@ -164,7 +172,6 @@ public class UniformParameterImpl implements UniformParameter {
 			startPositionCfg += sizeDEF;
 		
 		System.arraycopy(fileService.IntToBit32( startPositionCfg ), 0, newDataUniParam, uniparam_part_posConfig_offset, uniparam_part_posConfig_size);		
-		int lengthREAL = 120;
 		byte[] lengthConfig = fileService.IntToBit32(lengthREAL);
 		System.arraycopy(lengthConfig, 0, newDataUniParam, uniparam_part_lengthConfig_offset, uniparam_part_lengthConfig_size);
 				
@@ -182,9 +189,9 @@ public class UniformParameterImpl implements UniformParameter {
 		newData = updatePositions (newData, index + uniparam_dataSize, newField.length, 0);
 		
 		//Add new real configuration				
-		newField = getRealConfigBytes();					
+		newField = getRealConfigBytes(newFileName);					
 		startPositionCfg += uniparam_dataSize;
-		startPositionCfg += newFileName.length();
+		startPositionCfg += newFileName.length() + 1;
 		newData = addDataToFile (newData, newField, 0, startPositionCfg);
 		newData = updatePositions (newData, index + uniparam_dataSize, sizeREAL, 1);
 		
@@ -254,11 +261,77 @@ public class UniformParameterImpl implements UniformParameter {
 	    return newData;
 	}
 	
-	private byte[] getRealConfigBytes(){
-		byte[] newField = new byte[sizeREAL];
-		for(int i = 0;i<sizeREAL;i++)
-			newField[i] = 0;
-		return newField;
+	private byte[] getRealConfigBytes(String fileName){
+		String numKit = fileName.split("_")[0];
+		while(numKit.length() < 4) numKit = "0"+numKit;		
+		String typeKit = "p1";
+		if(fileName.indexOf("2nd") > -1) typeKit = "p2"; else
+			if(fileName.indexOf("3rd") > -1) typeKit = "p3"; else
+				if(fileName.indexOf("4th") > -1) typeKit = "p4"; else
+					if(fileName.indexOf("GK1st") > -1) typeKit = "g1";		
+		String kitName = String.format("u%s%s", numKit, typeKit);
+		
+		byte[] initCgf = new byte[] {
+				(byte)0x01, (byte)0x90 , (byte)0x3E, (byte)0x01,
+				(byte)0xFF, (byte)0xFF , (byte)0xFF, (byte)0xFF , (byte)0xFF, (byte)0xFF , (byte)0xFF, (byte)0xFF , 
+				(byte)0xFF, (byte)0xFF , (byte)0xFF, (byte)0xFF , (byte)0xFF, (byte)0xFF , (byte)0xFF, (byte)0x09 ,
+				(byte)0x02, (byte)0x02 , (byte)0x07, (byte)0x32 , (byte)0x12, (byte)0x13 , (byte)0x75, (byte)0x0B , 
+				(byte)0x40, (byte)0x18 , (byte)0x11, (byte)0x75 , (byte)0xD4, (byte)0x51 , (byte)0x47, (byte)0x01 , 
+				(byte)0x40, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , 
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 ,
+				(byte)0x00, (byte)0x00 , (byte)0x00, (byte)0x00 };
+		
+		int offset = kit_mainName_offset;
+		System.arraycopy(fileService.StringToBytes(kitName), 0, initCgf, offset, kitName.length());
+		offset += kit_mainName_size;
+		kitName = kitName+"_back";
+		System.arraycopy(fileService.StringToBytes(kitName), 0, initCgf, offset, kitName.length());
+		return initCgf;	
+	}
+	
+	public String loadConfigImport(String data) throws Exception{		
+		byte[] dataBytes = fileService.getDataBytes(data);		
+		
+		ObjectMapper mapper = new ObjectMapper();
+		String jsonInString = mapper.writeValueAsString(fileService.getJsonFromBytes(dataBytes));
+		return jsonInString;
+	}
+	
+	/**
+	 * set import data
+	 */
+	public String importCfgUniParam(ImportedData importedData)throws Exception{
+		byte[] srcData = fileService.getDataBytes(importedData.getSrcData());
+		int index = importedData.getIndexName();
+		byte[] importData = fileService.getDataBytes(importedData.getNewData());
+		
+		//name	
+		byte[] posName = Arrays.copyOfRange(srcData, index + uniparam_part_posName_offset, index + uniparam_part_posName_offset + uniparam_part_posName_size);
+		int startPositionName = fileService.bit32ToInt(posName);
+		int endPositionName = fileService.indexOfByteArray(srcData, zero, startPositionName);
+		byte[] filenameBytes = Arrays.copyOfRange(srcData, startPositionName, endPositionName);
+		String filename = fileService.bytesToString(filenameBytes);
+		
+		byte[] posConfig = Arrays.copyOfRange(srcData, index + uniparam_part_posConfig_offset, index + uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
+		int startPositionCfg = fileService.bit32ToInt(posConfig);		
+		int cfgLength = 0;
+		if(filename.indexOf(REAL)>0)
+			cfgLength = lengthREAL;
+		else
+			cfgLength = sizeDEF;
+		
+		System.arraycopy(importData, 0, srcData, startPositionCfg, cfgLength);
+		
+		return readUniParam(fileService.getJsonFromBytes(srcData));
 	}
 	
 	/**
@@ -280,31 +353,31 @@ public class UniformParameterImpl implements UniformParameter {
 		if(filename.indexOf(REAL)>0){
 			byte[] dataUniParam = Arrays.copyOfRange(srcData, offset, offset + uniparam_dataSize);
 			byte[] posConfigReg = Arrays.copyOfRange(dataUniParam, uniparam_part_posConfig_offset, uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
-			int posConfigRegInt = fileService.bit32ToInt(posConfigReg);
-			
+			int posConfigRegInt = fileService.bit32ToInt(posConfigReg);			
 		    byte[] kitConfigBytes = Arrays.copyOfRange(srcData, posConfigRegInt, posConfigRegInt + sizeREAL);
 		    
-		    String filenameKit, filenameBack, filenameChest, filenameLeg, filenameName;
+		    String[] filenames  = new String[5];
 		    int nameOffset = kit_mainName_offset;
-		    byte[] filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
-		    filenameKit = fileService.bytesToString(filenames);
-		    nameOffset += kit_mainName_size;
-		    filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
-		    filenameBack = fileService.bytesToString(filenames);
-		    nameOffset += kit_mainName_size;
-		    filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
-		    filenameChest = fileService.bytesToString(filenames);
-		    nameOffset += kit_mainName_size;
-		    filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
-		    filenameLeg = fileService.bytesToString(filenames);
-		    nameOffset += kit_mainName_size;
-		    filenames = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
-		    filenameName = fileService.bytesToString(filenames);		    
+		    for(int i = 0; i<5; i++)
+		    {
+		    	byte[] currentFilename = Arrays.copyOfRange(kitConfigBytes, nameOffset, nameOffset + kit_mainName_size);
+		    	filenames[i] = fileService.bytesToString(currentFilename);
+		    	nameOffset += kit_mainName_size;
+		    }		    
 		    
-		    kitConfiguration = new kitConfiguration(filenameKit, filenameBack, filenameChest, filenameLeg, filenameName);
+		    String[] colors = new String[5];
+		    int colorsOffset = kit_firstColor_offset;
+		    for(int i = 0; i<5; i++)
+		    {
+			    byte[] color = Arrays.copyOfRange(kitConfigBytes, colorsOffset, colorsOffset + kit_color_size);
+			    colors[i] = String.format("#%s", fileService.bytesToHexString(color));
+			    colorsOffset += kit_color_size;
+		    }
+		    
+		    kitConfiguration = new kitConfiguration(filenames, colors);
 		    
 		}else				
-			kitConfiguration = new kitConfiguration("DEF_NAME", "", "", "", "");
+			kitConfiguration = new kitConfiguration(null, null);
 		ObjectMapper mapper = new ObjectMapper();
 		String jsonInString = mapper.writeValueAsString(kitConfiguration);
 		return jsonInString;		

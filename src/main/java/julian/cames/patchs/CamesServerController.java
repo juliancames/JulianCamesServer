@@ -8,9 +8,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import julian.cames.patchs.services.files.FileService;
-import julian.cames.patchs.services.uniparam.AddUniParam;
-import julian.cames.patchs.services.uniparam.ModifyUniParam;
 import julian.cames.patchs.services.uniparam.UniformParameter;
+import julian.cames.patchs.services.uniparam.dto.AddUniParam;
+import julian.cames.patchs.services.uniparam.dto.ImportedData;
+import julian.cames.patchs.services.uniparam.dto.ModifyUniParam;
 
 @RestController
 public class CamesServerController {
@@ -46,5 +47,17 @@ public class CamesServerController {
     @PostMapping("/getConfigData")
     public String getConfigData(@RequestBody ModifyUniParam modifyUniParam) throws Exception{
     	return uniformParameter.getConfigData(modifyUniParam);
+    }
+    
+    @CrossOrigin
+    @PostMapping("/loadConfigImport")
+    public String getConfigImport(@RequestBody String strBytes) throws Exception{
+    	return uniformParameter.loadConfigImport(strBytes);
+    }
+    
+    @CrossOrigin
+    @PostMapping("/importCfgUniParam")
+    public String importCfgUniParam(@RequestBody ImportedData importedData) throws Exception{
+    	return uniformParameter.importCfgUniParam(importedData);
     }
 }

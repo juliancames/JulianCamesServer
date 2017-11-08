@@ -1,4 +1,4 @@
-package julian.cames.patchs.services.uniparam;
+package julian.cames.patchs.services.uniparam.dto;
 
 import java.util.List;
 

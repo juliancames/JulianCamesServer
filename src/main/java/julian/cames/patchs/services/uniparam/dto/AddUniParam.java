@@ -1,4 +1,4 @@
-package julian.cames.patchs.services.uniparam;
+package julian.cames.patchs.services.uniparam.dto;
 
 public class AddUniParam {
 	int indexName;
