@@ -11,6 +11,7 @@ import julian.cames.patchs.services.files.FileService;
 import julian.cames.patchs.services.uniparam.UniformParameter;
 import julian.cames.patchs.services.uniparam.dto.AddUniParam;
 import julian.cames.patchs.services.uniparam.dto.ImportedData;
+import julian.cames.patchs.services.uniparam.dto.MergeData;
 import julian.cames.patchs.services.uniparam.dto.ModifyUniParam;
 
 @RestController
@@ -59,5 +60,17 @@ public class CamesServerController {
     @PostMapping("/importCfgUniParam")
     public String importCfgUniParam(@RequestBody ImportedData importedData) throws Exception{
     	return uniformParameter.importCfgUniParam(importedData);
+    }
+    
+    @CrossOrigin
+    @PostMapping("/getUniParamForMerge")
+    public String getUniParamForMerge(@RequestBody String strBytes) throws Exception{
+    	return uniformParameter.readUniParam(strBytes);
+    }
+    
+    @CrossOrigin
+    @PostMapping("/mergeUniParam")
+    public String mergeUniParam(@RequestBody MergeData mergeData) throws Exception{
+    	return uniformParameter.mergeUniParam(mergeData);
     }
 }

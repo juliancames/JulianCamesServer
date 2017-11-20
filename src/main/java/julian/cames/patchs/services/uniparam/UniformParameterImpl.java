@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import julian.cames.patchs.services.files.FileService;
 import julian.cames.patchs.services.uniparam.dto.AddUniParam;
 import julian.cames.patchs.services.uniparam.dto.ImportedData;
+import julian.cames.patchs.services.uniparam.dto.MergeData;
 import julian.cames.patchs.services.uniparam.dto.ModifyUniParam;
 import julian.cames.patchs.services.uniparam.dto.PositionUni;
 import julian.cames.patchs.services.uniparam.dto.ResponseUniParam;
@@ -98,6 +99,71 @@ public class UniformParameterImpl implements UniformParameter {
 		return jsonInString;
 	}
 	
+	public String mergeUniParam(MergeData mergeData) throws Exception{
+		byte[] srcBytes = fileService.getDataBytes(mergeData.getSrcData());
+		byte[] numOfElementsByteSrc = Arrays.copyOfRange(srcBytes, uniparam_numElementsOffset, uniparam_numElementsOffset + uniparam_numElementsSize);
+		int numOfElementsSrc = fileService.bit32ToInt(numOfElementsByteSrc);
+		String[] srcNames = new String[numOfElementsSrc];
+		int offsetSrc = uniparam_offsetIni;
+		for(int i=0; i<numOfElementsSrc; i++){
+			byte[] dataUniParam = Arrays.copyOfRange(srcBytes, offsetSrc, offsetSrc + uniparam_dataSize);
+			byte[] posNameReg = Arrays.copyOfRange(dataUniParam, uniparam_part_posName_offset, uniparam_part_posName_offset + uniparam_part_posName_size);
+			//name			
+			int startPositionName = fileService.bit32ToInt(posNameReg);
+			int endPositionName = fileService.indexOfByteArray(srcBytes, zero, startPositionName);
+			byte[] filenameBytes = Arrays.copyOfRange(srcBytes, startPositionName, endPositionName);
+			String filename = fileService.bytesToString(filenameBytes);
+			srcNames[i] = filename;
+			
+			offsetSrc += uniparam_dataSize;
+		}
+		
+		byte[] toMergeBytes = fileService.getDataBytes(mergeData.getToMergeData());
+		byte[] numOfElementsByteToMerge = Arrays.copyOfRange(toMergeBytes, uniparam_numElementsOffset, uniparam_numElementsOffset + uniparam_numElementsSize);
+		int numOfElementsToMerge = fileService.bit32ToInt(numOfElementsByteToMerge);
+		String[] toMergeNames = new String[numOfElementsToMerge];
+		byte[][] toMergeConfig = new byte[numOfElementsToMerge][];
+		int offsetToMerge = uniparam_offsetIni;
+		for(int i=0; i<numOfElementsToMerge; i++){
+			byte[] dataUniParam = Arrays.copyOfRange(toMergeBytes, offsetToMerge, offsetToMerge + uniparam_dataSize);
+			byte[] posNameReg = Arrays.copyOfRange(dataUniParam, uniparam_part_posName_offset, uniparam_part_posName_offset + uniparam_part_posName_size);
+			byte[] posConfigReg = Arrays.copyOfRange(dataUniParam, uniparam_part_posConfig_offset, uniparam_part_posConfig_offset + uniparam_part_posConfig_size);
+			//name			
+			int startPositionName = fileService.bit32ToInt(posNameReg);
+			int endPositionName = fileService.indexOfByteArray(toMergeBytes, zero, startPositionName);
+			byte[] filenameBytes = Arrays.copyOfRange(toMergeBytes, startPositionName, endPositionName);
+			String filename = fileService.bytesToString(filenameBytes);
+			toMergeNames[i] = filename;
+			//ConfigUni
+			int sizeConfig = sizeDEF;
+			if(filename.indexOf(REAL)>0)
+				sizeConfig = sizeREAL;
+			int startPositionConfig = fileService.bit32ToInt(posConfigReg);
+			byte[] configBytes = Arrays.copyOfRange(toMergeBytes, startPositionConfig, startPositionConfig + sizeConfig);
+			toMergeConfig[i] = configBytes;
+			
+			offsetToMerge += uniparam_dataSize;
+		}
+		
+		byte[] newData = new byte[srcBytes.length];
+		System.arraycopy(srcBytes, 0, newData, 0, srcBytes.length);
+		int offsetToInsert = uniparam_offsetIni;
+		int countNew = 0;
+		for(int i=0; i<numOfElementsToMerge; i++){
+			String current = toMergeNames[i];
+			int posIdx = Arrays.asList(srcNames).indexOf(current);
+			if(posIdx == -1) {
+				newData = addKit(newData, offsetToInsert, current, toMergeConfig[i]);
+				countNew++;
+				offsetToInsert += uniparam_dataSize;
+			}else {
+				offsetToInsert = uniparam_offsetIni + (posIdx * uniparam_dataSize) + (countNew * uniparam_dataSize);
+			}
+		}
+		
+	    return readUniParam(fileService.getJsonFromBytes(newData));
+	}
+	
 	public String modifyRegUniParamToReal(ModifyUniParam modifyUniParam) throws Exception{
 		byte[] srcData = fileService.getDataBytes(modifyUniParam.getSrcData());
 		int index = modifyUniParam.getIndexName();
@@ -137,12 +203,28 @@ public class UniformParameterImpl implements UniformParameter {
 		return readUniParam(fileService.getJsonFromBytes(newData));
 	}
 	
-	public String addKit(AddUniParam addUniParam)throws Exception
-	{
+	public String addKit(AddUniParam addUniParam)throws Exception{
 		byte[] srcData = fileService.getDataBytes(addUniParam.getSrcData());
 		int index = addUniParam.getIndexName();
 		String addNumKit = addUniParam.getNumKit();
 		
+		//current (parent) name	
+		byte[] posName = Arrays.copyOfRange(srcData, index + uniparam_part_posName_offset, index + uniparam_part_posName_offset + uniparam_part_posName_size);
+		int startPositionName = fileService.bit32ToInt(posName);
+		int endPositionName = fileService.indexOfByteArray(srcData, zero, startPositionName);
+		byte[] filenameBytes = Arrays.copyOfRange(srcData, startPositionName, endPositionName);
+		String filename = fileService.bytesToString(filenameBytes);		
+		//set new filename
+	    String numKit = filename.split("_")[0];
+	    String newFileName = String.format("%s_DEF_%s_realUni.bin", numKit, addNumKit);
+	    
+	    byte[] newData = addKit(srcData, index, newFileName, getRealConfigBytes(newFileName));
+	    return readUniParam(fileService.getJsonFromBytes(newData));
+	}
+	
+	//public String addKit(AddUniParam addUniParam)throws Exception
+	private byte[] addKit(byte[] srcData, int index, String newFileName, byte[] newConfig)throws Exception
+	{		
 		//name	
 		byte[] posName = Arrays.copyOfRange(srcData, index + uniparam_part_posName_offset, index + uniparam_part_posName_offset + uniparam_part_posName_size);
 		int startPositionName = fileService.bit32ToInt(posName);
@@ -178,24 +260,21 @@ public class UniformParameterImpl implements UniformParameter {
 		byte[] newData = addDataToFile (srcData, newDataUniParam, 0, index + uniparam_dataSize);	
 	    newData = updatePositions (newData, 0, uniparam_dataSize, 2);
 	    
-	    //Add real filename
-	    String numKit = filename.split("_")[0];
-	    String newFileName = String.format("%s_DEF_%s_realUni.bin", numKit, addNumKit);
-		
+	    //Add real filename	
 		byte[] newField = new byte[newFileName.length() + 1];
 		System.arraycopy(fileService.StringToBytes(newFileName), 0, newField, 0,newFileName.length());	
 		newstartPositionName += uniparam_dataSize;
 		newData = addDataToFile (newData, newField, 0, newstartPositionName);
 		newData = updatePositions (newData, index + uniparam_dataSize, newField.length, 0);
 		
-		//Add new real configuration				
-		newField = getRealConfigBytes(newFileName);					
+		//Add new real configuration	
+		newField = newConfig;
 		startPositionCfg += uniparam_dataSize;
 		startPositionCfg += newFileName.length() + 1;
 		newData = addDataToFile (newData, newField, 0, startPositionCfg);
 		newData = updatePositions (newData, index + uniparam_dataSize, sizeREAL, 1);
 		
-		return readUniParam(fileService.getJsonFromBytes(newData));
+		return newData;
 	}
 	
 	/**

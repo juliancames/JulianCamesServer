@@ -2,6 +2,7 @@ package julian.cames.patchs.services.uniparam;
 
 import julian.cames.patchs.services.uniparam.dto.AddUniParam;
 import julian.cames.patchs.services.uniparam.dto.ImportedData;
+import julian.cames.patchs.services.uniparam.dto.MergeData;
 import julian.cames.patchs.services.uniparam.dto.ModifyUniParam;
 
 public interface UniformParameter {
@@ -11,4 +12,5 @@ public interface UniformParameter {
 	public String getConfigData(ModifyUniParam modifyUniParam) throws Exception;
 	public String loadConfigImport(String data) throws Exception;
 	public String importCfgUniParam(ImportedData importedData)throws Exception;
+	public String mergeUniParam(MergeData data) throws Exception;
 }
